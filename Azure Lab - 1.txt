@@ -162,3 +162,111 @@ WEB02-PIP 74.225.250.242
 Remove-AzResourceGroup -Name "NetworkWatcherRG" -Force
 
 Get-AzResourceGroup -Name "RG-IT-PROD" -ErrorAction SilentlyContinue
+
+#=============================Foreach LOOP=================================
+
+# =========================================================================
+# 1. PRE-REQUISITE DEFINITIONS & SECURITY RULES
+# =========================================================================
+$cred     = Get-Credential -UserName "azureuser" -Message "Enter local VM Administrator Password"
+$location = "CentralIndia"
+
+# Define the custom inbound RDP rule object
+$rdpRule = New-AzNetworkSecurityRuleConfig `
+  -Name "ALLOW-RDP" `
+  -Description "Allow RDP traffic" `
+  -Access "Allow" `
+  -Protocol "Tcp" `
+  -Direction "Inbound" `
+  -Priority 100 `
+  -SourceAddressPrefix "Internet" `
+  -SourcePortRange "*" `
+  -DestinationAddressPrefix "*" `
+  -DestinationPortRange "3389"
+
+# =========================================================================
+# 2. DEFINE THE ARRAY OF UNIQUE VM CONFIGURATIONS (CHANGED TO 2 VMs)
+# =========================================================================
+$vmList = @(
+    [PSCustomObject]@{ Name = "WEB01-AZ01"; Zone = 1; PipName = "WEB01-PIP" }
+    [PSCustomObject]@{ Name = "WEB02-AZ02"; Zone = 2; PipName = "WEB02-PIP" }
+	.
+	..
+	...
+	
+)
+
+# =========================================================================
+# 3. EXECUTE THE AUTOMATED FOREACH DEPLOYMENT LOOP
+# =========================================================================
+foreach ($vm in $vmList) {
+    Write-Host "Starting deployment for VM: $($vm.Name) in Zone: $($vm.Zone)..." -ForegroundColor Cyan
+    
+    New-AzVM `
+      -ResourceGroupName "RG-IT-PROD" `
+      -Location $location `
+      -Name $vm.Name `
+      -Zone $vm.Zone `
+      -Size "Standard_B2s_v2" `
+      -ImageName "MicrosoftWindowsServer:WindowsServer:2025-Datacenter-Azure-Edition:latest" `
+      -Credential $cred `
+      -SecurityGroupName "WEBSUBNETNSG" `
+      -SecurityRuleConfig $rdpRule `
+      -VirtualNetworkName "myvnet" `
+      -AddressPrefix "192.168.0.0/16" `
+      -SubnetName "WEBSUBNET" `
+      -SubnetAddressPrefix "192.168.0.0/24" `
+      -PublicIpAddressName $vm.PipName
+}
+
+Write-Host "Both Virtual Machines deployed successfully!" -ForegroundColor Green
+
+# 1. Get the Public IPs to verify connectivity
+Get-AzPublicIpAddress -ResourceGroupName "RG-IT-PROD" | Select-Object Name, IpAddress
+
+# 2. Complete lab tear down (Run this when finished to stop billing charges)
+Remove-AzResourceGroup -Name "RG-IT-PROD" -Force -AsJob
+
+=======================Bulk VM deployment====================================
+# =========================================================================
+# 1. PARAMETERS & CREDENTIAL DEFINITIONS
+# =========================================================================
+$cred      = Get-Credential -UserName "azureuser" -Message "Enter local VM Administrator Password"
+$location  = "CentralIndia"
+$vmSize    = "Standard_B2s_v2"
+$targetZone = 1 # Forces all VMs into Availability Zone 1
+
+# Prompt you to specify the target number of VMs
+$vmCount = [int](Read-Host "Enter the number of virtual machines you want to deploy")
+
+# =========================================================================
+# 2. RUN THE AUTOMATED INCREMENTAL LOOP
+# =========================================================================
+for ($i = 1; $i -le $vmCount; $i++) {
+    
+    # Pad numbers with a leading zero for clean naming conventions (e.g., WEB01, WEB02)
+    $vmIndex = $i.ToString("00")
+    $currentVmName  = "WEB$vmIndex-AZ0$targetZone"
+    $currentPipName = "WEB$vmIndex-PIP"
+    
+    Write-Host "Deploying VM [$i of $vmCount]: $currentVmName into Zone $targetZone..." -ForegroundColor Cyan
+    
+    New-AzVM `
+      -ResourceGroupName "RG-IT-PROD" `
+      -Location $location `
+      -Name $currentVmName `
+      -Zone $targetZone `
+      -Size $vmSize `
+      -ImageName "MicrosoftWindowsServer:WindowsServer:2025-Datacenter-Azure-Edition:latest" `
+      -Credential $cred `
+      -SecurityGroupName "WEBSUBNETNSG" `
+      -VirtualNetworkName "myvnet" `
+      -AddressPrefix "192.168.0.0/16" `
+      -SubnetName "WEBSUBNET" `
+      -SubnetAddressPrefix "192.168.0.0/24" `
+      -PublicIpAddressName $currentPipName
+      
+    Write-Host "✅   Successfully completed deployment for $currentVmName" -ForegroundColor Green
+}
+
+Write-Host "All $vmCount Virtual Machines have been successfully deployed!" -ForegroundColor Yellow
