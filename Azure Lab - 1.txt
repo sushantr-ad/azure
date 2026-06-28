@@ -51,10 +51,24 @@ az network vnet create `
 # 3. IMPLEMENT STEP 4 (VIRTUAL MACHINES CREATION)
 # =========================================================================
 
-# Step 4a: Create VM 1 (WEB01-AZ01) in Availability Zone 2
+# Step 4a: Create VM 1 (WEB01-AZ01) in Availability Zone 1
 az vm create `
   --resource-group $resourceGroup `
   --name "WEB01-AZ01" `
+  --location $location `
+  --size $vmSize `
+  --image "Win2022AzureEditionCore" `
+  --vnet-name $vnetName `
+  --subnet $subnetName `
+  --nsg $nsgName `
+  --zone 1 `
+  --admin-username "azureuser" `
+  --admin-password "SecureProdPass123!"
+
+# Step 4a: Create VM 2 (WEB02-AZ02) in Availability Zone 2
+az vm create `
+  --resource-group $resourceGroup `
+  --name "WEB02-AZ02" `
   --location $location `
   --size $vmSize `
   --image "Win2022AzureEditionCore" `
@@ -65,16 +79,18 @@ az vm create `
   --admin-username "azureuser" `
   --admin-password "SecureProdPass123!"
 
-# Step 4a: Create VM 2 (WEB02-AZ02) in Availability Zone 3
-az vm create `
-  --resource-group $resourceGroup `
-  --name "WEB02-AZ02" `
-  --location $location `
-  --size $vmSize `
-  --image "Win2022AzureEditionCore" `
-  --vnet-name $vnetName `
-  --subnet $subnetName `
-  --nsg $nsgName `
-  --zone 3 `
-  --admin-username "azureuser" `
-  --admin-password "SecureProdPass123!"
+# Step 5 Cleanup: Delete the Resource Group once the lab is done
+
+Remove-AzResourceGroup `
+  --Name "RG-IT-PROD" `
+  --Force `
+  --AsJob
+
+# OR  
+
+az group delete `
+  --name "RG-IT-PROD" `
+  --yes `
+  --no-wait
+
+
