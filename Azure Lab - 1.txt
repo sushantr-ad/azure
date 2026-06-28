@@ -1,0 +1,80 @@
+
+
+#Azure Lab 1
+# =========================================================================
+# 1. DEFINE VARIABLES
+# =========================================================================
+$resourceGroup = "RG-IT-PROD"
+$location      = "centralindia" # Adjust to your target region supporting zones
+$vnetName      = "VNET-PROD"
+$vnetPrefix    = "192.168.0.0/16"
+$subnetName    = "WEBSUBNET"
+$subnetPrefix  = "192.168.0.0/24"
+$nsgName       = "WEBSUBNETNSG"
+$vmSize        = "Standard_B2s" # Switch to Standard_B2ls if preferred
+
+# =========================================================================
+# 2. IMPLEMENT STEPS 1 TO 3 (INFRASTRUCTURE SETUP)
+# =========================================================================
+
+# Step 1: Create Resource Group
+az group create --name $resourceGroup --location $location
+
+# Step 3: Create Network Security Group (NSG) 
+# Note: Executed before VNet to simplify direct binding during VNet creation
+az network nsg create --resource-group $resourceGroup --name $nsgName
+
+# Step 3a: Create inbound ALLOW-RDP rule
+az network nsg rule create `
+  --resource-group $resourceGroup `
+  --nsg-name $nsgName `
+  --name "ALLOW-RDP" `
+  --priority 100 `
+  --direction "Inbound" `
+  --access "Allow" `
+  --protocol "Tcp" `
+  --source-address-prefixes "*" `
+  --source-port-ranges "*" `
+  --destination-address-prefixes "*" `
+  --destination-port-ranges 3389
+
+# Step 2 & 3b: Create VNet, Subnet, and Attach NSG immediately to the Subnet
+az network vnet create `
+  --resource-group $resourceGroup `
+  --name $vnetName `
+  --address-prefixes $vnetPrefix `
+  --subnet-name $subnetName `
+  --subnet-prefixes $subnetPrefix `
+  --nsg $nsgName
+
+# =========================================================================
+# 3. IMPLEMENT STEP 4 (VIRTUAL MACHINES CREATION)
+# =========================================================================
+
+# Step 4a: Create VM 1 (WEB01-AZ01) in Availability Zone 1
+az vm create `
+  --resource-group $resourceGroup `
+  --name "WEB01-AZ01" `
+  --location $location `
+  --size $vmSize `
+  --image "Win2022AzureEditionCore" `
+  --vnet-name $vnetName `
+  --subnet $subnetName `
+  --nsg $nsgName `
+  --zone 1 `
+  --admin-username "azureuser" `
+  --admin-password "SecureProdPass123!"
+
+# Step 4a: Create VM 2 (WEB02-AZ02) in Availability Zone 2
+az vm create `
+  --resource-group $resourceGroup `
+  --name "WEB02-AZ02" `
+  --location $location `
+  --size $vmSize `
+  --image "Win2022AzureEditionCore" `
+  --vnet-name $vnetName `
+  --subnet $subnetName `
+  --nsg $nsgName `
+  --zone 2 `
+  --admin-username "azureuser" `
+  --admin-password "SecureProdPass123!"
